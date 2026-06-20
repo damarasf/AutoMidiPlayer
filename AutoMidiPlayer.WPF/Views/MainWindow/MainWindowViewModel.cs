@@ -126,6 +126,7 @@ public class MainWindowViewModel : Conductor<IScreen>, IHandle<MidiFile>
         // QueueView and SongsView depend on Playback being initialized
         QueueView = new(ioc, this);
         SongsView = new(ioc, this);
+        BrowseView = new(this);
         PianoSheetView = new(this, new Controls.NoSongPlaceholder.NoSongPlaceholderComponent(this));
 
         _ = AboutViewModel.GetContributorsAsync();
@@ -183,6 +184,8 @@ public class MainWindowViewModel : Conductor<IScreen>, IHandle<MidiFile>
 
     public SongsViewModel SongsView { get; }
 
+    public BrowseViewModel BrowseView { get; }
+
     public TrackViewModel TrackView { get; }
 
     public PianoSheetViewModel PianoSheetView { get; }
@@ -204,6 +207,7 @@ public class MainWindowViewModel : Conductor<IScreen>, IHandle<MidiFile>
         "Queue" => "Queue",
         "Settings" => "Settings",
         "Songs" => "Songs",
+        "Online" => "Online",
         _ => "Songs"
     };
 
@@ -215,6 +219,7 @@ public class MainWindowViewModel : Conductor<IScreen>, IHandle<MidiFile>
         "Instrument" => InstrumentView,
         "Queue" => QueueView,
         "Settings" => SettingsView,
+        "Online" => BrowseView,
         "Songs" or _ => SongsView
     };
 

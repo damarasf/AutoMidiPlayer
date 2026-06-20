@@ -19,18 +19,13 @@ public class MidiDownloadService
 
     public MidiDownloadService()
     {
-        var individualSources = new IMidiSource[]
+        // Ordered by catalog completeness / popularity (the first is the default).
+        Sources = new IMidiSource[]
         {
-            new BitMidiSource(Client),
-            new ArchiveOrgSource(Client),
-            new FreeMidiSource(Client),
-            new VGMusicSource(Client)
+            new BitMidiSource(Client),   // ~113k popular songs (public API)
+            new MidisFreeSource(Client), // ~100k popular songs (scraped)
+            new FreeMidiSource(Client)   // pop-rock catalog (scraped)
         };
-
-        // "All sources" is listed first so it is the default and yields the widest result set.
-        Sources = new IMidiSource[] { new AllMidiSources(individualSources) }
-            .Concat(individualSources)
-            .ToList();
     }
 
     /// <summary>The online sources the user can choose between.</summary>
@@ -51,10 +46,7 @@ public class MidiDownloadService
     /// </summary>
     public Task<OnlineMidiSearchPage> SearchAsync(IMidiSource source, string query, int page, MidiCategory? category, CancellationToken cancellationToken)
     {
-        // Category-based sources (e.g. VGMusic) browse with an empty query; free-text sources need one.
-        if (string.IsNullOrWhiteSpace(query) && category is null)
-            return Task.FromResult(new OnlineMidiSearchPage(Array.Empty<OnlineMidiItem>(), page, 0, 0));
-
+        // An empty query browses the source's catalog; a non-empty one searches/filters within it.
         return source.SearchAsync(query?.Trim() ?? string.Empty, page, category, cancellationToken);
     }
 

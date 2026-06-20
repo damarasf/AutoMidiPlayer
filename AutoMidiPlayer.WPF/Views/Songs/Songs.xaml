@@ -51,13 +51,6 @@
                           Height="16"/>
                 </controls:Button>
                 <controls:Button Variant="Ghost"
-                                 Command="{s:Action DownloadFromOnline}"
-                                 Padding="8"
-                                 ToolTip="Download MIDI from online">
-                    <ui:SymbolIcon Symbol="ArrowDownload24"
-                                   FontSize="16"/>
-                </controls:Button>
-                <controls:Button Variant="Ghost"
                                  Command="{s:Action ConvertAudioToMidi}"
                                  Padding="8"
                                  ToolTip="Convert local audio (mp3/wav/...) to MIDI">

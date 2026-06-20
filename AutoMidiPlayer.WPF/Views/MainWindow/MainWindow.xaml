@@ -599,6 +599,10 @@
                                                    Icon="{ui:SymbolIcon Cd16}"
                                                    Tag="{Binding SongsView}"
                                                    Click="{s:Action NavigateToItem}"/>
+                            <ui:NavigationViewItem Content="Online"
+                                                   Icon="{ui:SymbolIcon CloudArrowDown24}"
+                                                   Tag="{Binding BrowseView}"
+                                                   Click="{s:Action NavigateToItem}"/>
                         </ui:NavigationView.MenuItems>
                         <ui:NavigationView.FooterMenuItems>
                             <ui:NavigationViewItem x:Name="GameDrawerItem"

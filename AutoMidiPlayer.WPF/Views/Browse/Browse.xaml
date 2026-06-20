@@ -1,0 +1,289 @@
+<UserControl
+    x:Class="AutoMidiPlayer.WPF.Views.BrowseView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    mc:Ignorable="d"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:s="https://github.com/canton7/Stylet"
+    xmlns:viewModels="clr-namespace:AutoMidiPlayer.WPF.ViewModels"
+    xmlns:controls="clr-namespace:AutoMidiPlayer.WPF.Controls"
+    d:DataContext="{d:DesignInstance Type=viewModels:BrowseViewModel}">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Tab bar: Search (native sources) vs MidiShow (embedded browser) -->
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal"
+                    Margin="0,0,0,10">
+            <Grid Margin="0,0,18,0">
+                <controls:Button Variant="Ghost"
+                                 Padding="4,4"
+                                 Command="{s:Action ShowSearch}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Search24" FontSize="16" Margin="0,0,6,0"/>
+                        <TextBlock Text="Search" FontSize="14" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </controls:Button>
+                <Rectangle Height="2"
+                           VerticalAlignment="Bottom"
+                           Margin="2,0"
+                           RadiusX="1" RadiusY="1"
+                           Fill="{DynamicResource SystemAccentColorPrimaryBrush}"
+                           Visibility="{Binding IsSearchTab, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            </Grid>
+
+            <Grid>
+                <controls:Button Variant="Ghost"
+                                 Padding="4,4"
+                                 Command="{s:Action ShowMidiShow}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Globe24" FontSize="16" Margin="0,0,6,0"/>
+                        <TextBlock Text="MidiShow" FontSize="14" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </controls:Button>
+                <Rectangle Height="2"
+                           VerticalAlignment="Bottom"
+                           Margin="2,0"
+                           RadiusX="1" RadiusY="1"
+                           Fill="{DynamicResource SystemAccentColorPrimaryBrush}"
+                           Visibility="{Binding IsMidiShowTab, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            </Grid>
+        </StackPanel>
+
+        <!-- Content area: one of the two tabs -->
+        <Grid Grid.Row="1">
+
+            <!-- ============ SEARCH TAB (native sources) ============ -->
+            <Grid Visibility="{Binding IsSearchTab, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Source + (optional) category pickers -->
+                <Grid Grid.Row="0"
+                      Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="Source"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"/>
+
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding Sources}"
+                              DisplayMemberPath="Name"
+                              SelectedItem="{Binding SelectedSource, Mode=TwoWay}"/>
+
+                    <TextBlock Grid.Column="2"
+                               Text="Browse"
+                               VerticalAlignment="Center"
+                               Margin="14,0,8,0"
+                               Visibility="{Binding HasCategories, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                    <ComboBox Grid.Column="3"
+                              ItemsSource="{Binding Categories}"
+                              DisplayMemberPath="Name"
+                              SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                              Visibility="{Binding HasCategories, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                </Grid>
+
+                <!-- Search -->
+                <Grid Grid.Row="1"
+                      Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ui:TextBox Grid.Column="0"
+                                x:Name="SearchBox"
+                                PlaceholderText="{Binding SearchPlaceholder}"
+                                Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                Icon="Search12"
+                                KeyDown="OnSearchBoxKeyDown"
+                                VerticalAlignment="Center"/>
+
+                    <controls:Button Grid.Column="1"
+                                     Margin="6,0,0,0"
+                                     Variant="Filled"
+                                     Content="Search"
+                                     Command="{s:Action Search}"/>
+                </Grid>
+
+                <!-- Status / searching indicator -->
+                <Grid Grid.Row="2"
+                      Margin="0,0,0,6"
+                      MinHeight="18">
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding IsSearching, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <ui:ProgressRing IsIndeterminate="True"
+                                         Width="16"
+                                         Height="16"/>
+                        <TextBlock Text="Loading..."
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding StatusMessage}"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                </Grid>
+
+                <!-- Results list -->
+                <Border Grid.Row="3"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        Background="{DynamicResource ControlFillColorDefaultBrush}"
+                        CornerRadius="6">
+                    <ListView ItemsSource="{Binding Results}"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment"
+                                        Value="Stretch"/>
+                                <Setter Property="Padding"
+                                        Value="0"/>
+                                <Setter Property="Focusable"
+                                        Value="False"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="6,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <CheckBox Grid.Column="0"
+                                              VerticalAlignment="Center"
+                                              Margin="2,0,10,0"
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                              IsEnabled="{Binding CanSelect}"/>
+
+                                    <StackPanel Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                Margin="0,0,8,0">
+                                        <TextBlock Text="{Binding Name}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding Detail}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Column="2"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,4,0"
+                                               Text="{Binding StatusText}"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Visibility="{Binding ShowStatus, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                                    <ui:ProgressRing Grid.Column="2"
+                                                     IsIndeterminate="True"
+                                                     Width="18"
+                                                     Height="18"
+                                                     VerticalAlignment="Center"
+                                                     Margin="0,0,4,0"
+                                                     Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Border>
+
+                <!-- Pagination -->
+                <StackPanel Grid.Row="4"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            Margin="0,8,0,0"
+                            Visibility="{Binding ShowPagination, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <controls:Button Variant="Ghost"
+                                     Content="◄ Previous"
+                                     IsEnabled="{Binding CanGoPrevious}"
+                                     Command="{s:Action PreviousPage}"/>
+                    <TextBlock Text="{Binding PageInfo}"
+                               VerticalAlignment="Center"
+                               Margin="14,0"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                    <controls:Button Variant="Ghost"
+                                     Content="Next ►"
+                                     IsEnabled="{Binding CanGoNext}"
+                                     Command="{s:Action NextPage}"/>
+                </StackPanel>
+
+                <!-- Bottom action bar (always visible) -->
+                <Border Grid.Row="5"
+                        Margin="0,8,0,2"
+                        Padding="0,8,0,0"
+                        BorderThickness="0,1,0,0"
+                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <controls:SimpleStackPanel Grid.Column="0"
+                                                   Orientation="Horizontal"
+                                                   Spacing="6"
+                                                   VerticalAlignment="Center">
+                            <controls:Button Variant="Ghost"
+                                             Content="Select all"
+                                             IsEnabled="{Binding HasResults}"
+                                             Command="{s:Action SelectAll}"/>
+                            <controls:Button Variant="Ghost"
+                                             Content="Clear"
+                                             IsEnabled="{Binding HasSelection}"
+                                             Command="{s:Action ClearSelection}"/>
+                            <TextBlock Text="{Binding SelectionSummary}"
+                                       VerticalAlignment="Center"
+                                       Margin="6,0,0,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        </controls:SimpleStackPanel>
+
+                        <controls:Button Grid.Column="2"
+                                         Variant="Filled"
+                                         ColorMode="Accent"
+                                         Padding="16,8"
+                                         FontWeight="SemiBold"
+                                         Content="{Binding AddSelectedText}"
+                                         IsEnabled="{Binding CanAddSelected}"
+                                         Command="{s:Action AddSelected}"/>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- ============ MIDISHOW TAB (embedded browser) ============ -->
+            <ContentControl s:View.Model="{Binding MidiShow}"
+                            Visibility="{Binding IsMidiShowTab, Converter={StaticResource BoolToVisibilityConverter}}"/>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -34,11 +34,14 @@ public sealed class FreeMidiSource(HttpClient client) : IMidiSource
 
     public async Task<OnlineMidiSearchPage> SearchAsync(string query, int page, MidiCategory? category, CancellationToken cancellationToken)
     {
-        // FreeMidi's search returns a single, non-paginated result set.
+        // FreeMidi's search and browse pages are both single, non-paginated result sets.
         if (page > 1)
             return new OnlineMidiSearchPage(Array.Empty<OnlineMidiItem>(), page, 1, 0);
 
-        var url = $"{BaseUrl}/search?q={Uri.EscapeDataString(query)}";
+        // An empty query browses FreeMidi's "top MIDI" listing; a non-empty one searches.
+        var url = string.IsNullOrWhiteSpace(query)
+            ? $"{BaseUrl}/topmidi"
+            : $"{BaseUrl}/search?q={Uri.EscapeDataString(query)}";
         var html = await GetStringAsync(url, $"{BaseUrl}/", cancellationToken);
 
         var items = new List<OnlineMidiItem>();

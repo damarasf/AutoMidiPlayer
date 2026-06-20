@@ -29,6 +29,7 @@
         <PackageReference Include="Melanchall.DryWetMidi" Version="8.0.3" />
         <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.5" />
         <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+        <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
         <PackageReference Include="NAudio" Version="2.2.1" />
         <PackageReference Include="PropertyChanged.Fody" Version="4.1.0" PrivateAssets="All" />
         <PackageReference Include="Sentry" Version="6.6.0" />

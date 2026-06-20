@@ -20,7 +20,11 @@ public sealed class BitMidiSource(HttpClient client) : IMidiSource
 
     public async Task<OnlineMidiSearchPage> SearchAsync(string query, int page, MidiCategory? category, CancellationToken cancellationToken)
     {
-        var url = $"{BaseUrl}/api/midi/search?q={Uri.EscapeDataString(query)}&page={page}";
+        // An empty query browses the whole library; a non-empty one searches.
+        // Sending an empty "q=" returns nothing, so the parameter must be omitted entirely.
+        var url = string.IsNullOrWhiteSpace(query)
+            ? $"{BaseUrl}/api/midi/search?page={page}"
+            : $"{BaseUrl}/api/midi/search?q={Uri.EscapeDataString(query)}&page={page}";
 
         var response = await client.GetFromJsonAsync<ApiResponse>(url, cancellationToken);
         var result = response?.Result;
