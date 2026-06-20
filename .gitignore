@@ -351,5 +351,7 @@ MigrationBackup/
 .idea/
 
 .github/**/*instructions*
+.claude
+.vscode
 
 Benchmark
