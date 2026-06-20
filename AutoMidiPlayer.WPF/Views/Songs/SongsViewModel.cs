@@ -309,6 +309,31 @@ public class SongsViewModel : Screen
     }
 
     /// <summary>
+    /// Show the online MIDI search dialog, letting the user download MIDI files
+    /// from the internet straight into the song library.
+    /// </summary>
+    public async Task DownloadFromOnline()
+    {
+        var downloadService = new Services.MidiDownloadService();
+
+        var view = new OnlineMidiView(
+            downloadService,
+            async paths => await _main.FileService.AddFiles(paths));
+
+        await DialogHelper.ShowActionDialogAsync(new DialogActionRequest
+        {
+            Title = "Download MIDI from online",
+            Icon = SymbolRegular.ArrowDownload24,
+            Content = view,
+            ConfirmButton = null,
+            CancelButton = new DialogActionButton
+            {
+                Text = "Close"
+            }
+        });
+    }
+
+    /// <summary>
     /// Show the missing files dialog with individual delete buttons
     /// </summary>
     public async Task ShowMissingFilesDialog()

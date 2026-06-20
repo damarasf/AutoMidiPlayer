@@ -50,6 +50,13 @@
                           Width="16"
                           Height="16"/>
                 </controls:Button>
+                <controls:Button Variant="Ghost"
+                                 Command="{s:Action DownloadFromOnline}"
+                                 Padding="8"
+                                 ToolTip="Download MIDI from online">
+                    <ui:SymbolIcon Symbol="ArrowDownload24"
+                                   FontSize="16"/>
+                </controls:Button>
                 <controls:BusyActionButton Width="36"
                                            Height="32"
                                            Visibility="{Binding CanManuallyScanMidiFolder, Converter={x:Static s:BoolToVisibilityConverter.Instance}}"

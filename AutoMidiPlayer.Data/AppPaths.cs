@@ -87,6 +87,22 @@ public static class AppPaths
     public static readonly string UpdateCacheDirectory = Path.Combine(AppDataDirectory, "cache", "update");
 
     /// <summary>
+    /// Path to the directory where MIDI files downloaded from the internet are stored.
+    /// </summary>
+    public static readonly string DownloadedMidiDirectory = Path.Combine(AppDataDirectory, "downloads");
+
+    /// <summary>
+    /// Ensures the directory used for downloaded MIDI files exists and returns its path.
+    /// </summary>
+    public static string EnsureDownloadedMidiDirectory()
+    {
+        if (!Directory.Exists(DownloadedMidiDirectory))
+            Directory.CreateDirectory(DownloadedMidiDirectory);
+
+        return DownloadedMidiDirectory;
+    }
+
+    /// <summary>
     /// Ensures the app data directory exists
     /// </summary>
     public static void EnsureDirectoryExists()
