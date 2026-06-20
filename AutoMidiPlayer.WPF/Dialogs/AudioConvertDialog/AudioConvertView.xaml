@@ -1,0 +1,86 @@
+<UserControl x:Class="AutoMidiPlayer.WPF.Dialogs.AudioConvertView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+    </UserControl.Resources>
+
+    <StackPanel Width="480"
+                Background="Transparent"
+                Margin="0,0,12,0"
+                TextElement.Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+
+        <TextBlock TextWrapping="Wrap"
+                   Margin="0,0,0,4"
+                   Text="Transcribing audio into MIDI notes. Accuracy is best for a single, clear instrument (e.g. solo piano)."/>
+        <TextBlock TextWrapping="Wrap"
+                   FontSize="11"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,0,0,10"
+                   Text="The first run downloads a small (~225 KB) transcription model."/>
+
+        <Border BorderThickness="1"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                Background="{DynamicResource ControlFillColorDefaultBrush}">
+            <ScrollViewer MaxHeight="320"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="10,8,10,8"
+                                    BorderThickness="0,0,0,1"
+                                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0"
+                                                VerticalAlignment="Center"
+                                                Margin="0,0,8,0">
+                                        <TextBlock Text="{Binding FileName}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                    </StackPanel>
+
+                                    <ui:ProgressRing Grid.Column="1"
+                                                     IsIndeterminate="True"
+                                                     Width="20"
+                                                     Height="20"
+                                                     VerticalAlignment="Center"
+                                                     Visibility="{Binding IsConverting, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                                    <ui:SymbolIcon Grid.Column="1"
+                                                   Symbol="CheckmarkCircle24"
+                                                   FontSize="20"
+                                                   Foreground="{DynamicResource SystemFillColorSuccessBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding IsDone, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                                    <ui:SymbolIcon Grid.Column="1"
+                                                   Symbol="ErrorCircle24"
+                                                   FontSize="20"
+                                                   Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding IsFailed, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <TextBlock Text="{Binding Summary}"
+                   TextWrapping="Wrap"
+                   Margin="0,10,0,0"
+                   Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibilityConverter}}"/>
+    </StackPanel>
+</UserControl>

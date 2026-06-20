@@ -334,6 +334,40 @@ public class SongsViewModel : Screen
     }
 
     /// <summary>
+    /// Pick local audio file(s) and convert them to MIDI (via Basic Pitch), importing the results.
+    /// </summary>
+    public async Task ConvertAudioToMidi()
+    {
+        var openFileDialog = new OpenFileDialog
+        {
+            Filter = "Audio files|*.mp3;*.wav;*.m4a;*.aac;*.wma;*.flac;*.ogg|All files (*.*)|*.*",
+            Multiselect = true
+        };
+
+        if (openFileDialog.ShowDialog() != true)
+            return;
+
+        var converter = new Services.AudioToMidi.AudioToMidiConverter();
+
+        var view = new AudioConvertView(
+            openFileDialog.FileNames,
+            converter,
+            async midiPath => await _main.FileService.AddFiles(new[] { midiPath }));
+
+        await DialogHelper.ShowActionDialogAsync(new DialogActionRequest
+        {
+            Title = "Convert audio to MIDI",
+            Icon = SymbolRegular.MusicNote224,
+            Content = view,
+            ConfirmButton = null,
+            CancelButton = new DialogActionButton
+            {
+                Text = "Close"
+            }
+        });
+    }
+
+    /// <summary>
     /// Show the missing files dialog with individual delete buttons
     /// </summary>
     public async Task ShowMissingFilesDialog()

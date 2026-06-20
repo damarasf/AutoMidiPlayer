@@ -57,6 +57,13 @@
                     <ui:SymbolIcon Symbol="ArrowDownload24"
                                    FontSize="16"/>
                 </controls:Button>
+                <controls:Button Variant="Ghost"
+                                 Command="{s:Action ConvertAudioToMidi}"
+                                 Padding="8"
+                                 ToolTip="Convert local audio (mp3/wav/...) to MIDI">
+                    <ui:SymbolIcon Symbol="MusicNote224"
+                                   FontSize="16"/>
+                </controls:Button>
                 <controls:BusyActionButton Width="36"
                                            Height="32"
                                            Visibility="{Binding CanManuallyScanMidiFolder, Converter={x:Static s:BoolToVisibilityConverter.Instance}}"

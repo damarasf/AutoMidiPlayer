@@ -103,6 +103,22 @@ public static class AppPaths
     }
 
     /// <summary>
+    /// Path to the cache directory for the audio-to-MIDI converter (model, temp files).
+    /// </summary>
+    public static readonly string ConvertCacheDirectory = Path.Combine(AppDataDirectory, "cache", "convert");
+
+    /// <summary>
+    /// Ensures the audio-to-MIDI converter cache directory exists and returns its path.
+    /// </summary>
+    public static string EnsureConvertCacheDirectory()
+    {
+        if (!Directory.Exists(ConvertCacheDirectory))
+            Directory.CreateDirectory(ConvertCacheDirectory);
+
+        return ConvertCacheDirectory;
+    }
+
+    /// <summary>
     /// Ensures the app data directory exists
     /// </summary>
     public static void EnsureDirectoryExists()
