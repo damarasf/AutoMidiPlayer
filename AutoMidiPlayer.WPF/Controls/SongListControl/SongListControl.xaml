@@ -322,7 +322,13 @@
                                 <!-- Title + Artist stacked -->
                                 <StackPanel Grid.Column="1"
                                             VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Title}"
+                                  <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding Title}"
                                                TextTrimming="CharacterEllipsis">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
@@ -342,6 +348,29 @@
                                             </Style>
                                         </TextBlock.Style>
                                     </TextBlock>
+                                    <controls:Button Grid.Column="1"
+                                                     Variant="Ghost"
+                                                     Padding="5,2"
+                                                     Margin="6,0,0,0"
+                                                     VerticalAlignment="Center"
+                                                     Focusable="False"
+                                                     Tag="{Binding}"
+                                                     Click="FavoriteButton_Click"
+                                                     ToolTip="Favorite">
+                                        <ui:SymbolIcon Symbol="Heart12" FontSize="13" Filled="{Binding IsFavorite}">
+                                            <ui:SymbolIcon.Style>
+                                                <Style TargetType="ui:SymbolIcon">
+                                                    <Setter Property="Foreground" Value="{ui:ThemeResource TextFillColorTertiaryBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                                            <Setter Property="Foreground" Value="#E5484D"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ui:SymbolIcon.Style>
+                                        </ui:SymbolIcon>
+                                    </controls:Button>
+                                  </Grid>
                                     <TextBlock TextTrimming="CharacterEllipsis"
                                                FontSize="12"
                                                Opacity="0.6"

@@ -54,6 +54,9 @@ public sealed class MidiShowClient : IDisposable
     private readonly Dictionary<string, (string Html, DateTime At)> _pageCache = new();
     private static readonly TimeSpan PageCacheTtl = TimeSpan.FromMinutes(5);
 
+    // Latest CSRF token seen on any fetched page; reused for AJAX POSTs (favorite insert/delete).
+    private string _sessionCsrf = string.Empty;
+
     public bool IsAuthenticated { get; private set; }
 
     /// <summary>Last login attempt diagnostic (shown to the user / logged to help debugging).</summary>
@@ -78,6 +81,10 @@ public sealed class MidiShowClient : IDisposable
         // Cached pages are session/auth-specific — drop them when the session is rebuilt.
         lock (_pageCache)
             _pageCache.Clear();
+
+        // The CSRF token is tied to the session; a token from the previous (e.g. pre-login)
+        // session is invalid here and would make POSTs like favorite/insert silently fail.
+        _sessionCsrf = string.Empty;
 
         var handler = new HttpClientHandler
         {
@@ -194,6 +201,7 @@ public sealed class MidiShowClient : IDisposable
             url += "&sort=" + sort;
 
         var html = await GetStringAsync(url, referer: $"{Base}/en", cache: true, ct: ct);
+        CaptureCsrf(html);
         return ParseItems(html);
     }
 
@@ -210,6 +218,7 @@ public sealed class MidiShowClient : IDisposable
             url += "&sort=" + sort;
 
         var html = await GetStringAsync(url, referer: $"{Base}/en", cache: true, ct: ct);
+        CaptureCsrf(html);
         return ParseItems(html);
     }
 
@@ -229,6 +238,7 @@ public sealed class MidiShowClient : IDisposable
             throw new MidiShowException(MidiShowDownloadError.Network, "Could not load the MIDI details.", ex);
         }
 
+        CaptureCsrf(html);
         return ParseDetails(html, item);
     }
 
@@ -352,6 +362,153 @@ public sealed class MidiShowClient : IDisposable
             Logger.LogException(ex);
             throw new MidiShowException(MidiShowDownloadError.Decode, "Could not decode the downloaded MIDI file.", ex);
         }
+    }
+
+    #endregion
+
+    #region Account favorites
+
+    /// <summary>
+    /// Adds (<paramref name="add"/>=true) or removes a track from the signed-in MidiShow
+    /// account's favorites. Mirrors the site's own AJAX call (POST /en/favorite/insert|delete
+    /// with item_id + item_type=midi, CSRF + X-Requested-With). Returns true on success.
+    /// </summary>
+    public async Task<bool> SetFavoriteAsync(string id, bool add, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(id))
+            return false;
+
+        var action = add ? "insert" : "delete";
+        var url = $"{Base}/en/favorite/{action}";
+
+        // Up to 2 attempts: a stale CSRF (e.g. one captured before sign-in) makes MidiShow
+        // reject the POST with result:false. Refresh the token from a fresh page and retry once.
+        for (var attempt = 1; attempt <= 2; attempt++)
+        {
+            var csrf = await EnsureCsrfAsync(ct);
+
+            using var response = await SendAsync(() =>
+            {
+                var req = new HttpRequestMessage(HttpMethod.Post, url)
+                {
+                    Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                    {
+                        ["item_id"] = id,
+                        ["item_type"] = "midi"
+                    })
+                };
+                req.Content.Headers.ContentType = new MediaTypeHeaderValue("application/x-www-form-urlencoded") { CharSet = "UTF-8" };
+                req.Headers.TryAddWithoutValidation("Origin", Base);
+                req.Headers.TryAddWithoutValidation("Referer", $"{Base}/en/midi");
+                req.Headers.TryAddWithoutValidation("X-Csrf-Token", csrf);
+                req.Headers.TryAddWithoutValidation("X-Requested-With", "XMLHttpRequest");
+                AddAcceptHeaders(req, xhr: true);
+                return req;
+            }, ct);
+
+            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
+                throw new MidiShowException(MidiShowDownloadError.NotAuthenticated, "Sign in to MidiShow to manage account favorites.");
+
+            var body = await response.Content.ReadAsStringAsync(ct);
+            // Response shape: {"result":true,"title":"..."}
+            if (Regex.IsMatch(body, "\"result\"\\s*:\\s*true", RegexOptions.IgnoreCase))
+                return true;
+
+            // Likely a stale CSRF token — force a fresh one and retry once.
+            _sessionCsrf = string.Empty;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Fetches all of the account's favorited MIDIs (pages through the My Favorites table).
+    /// Requires an authenticated session.
+    /// </summary>
+    public async Task<List<MidiShowItem>> GetAccountFavoritesAllAsync(CancellationToken ct = default)
+    {
+        var all = new List<MidiShowItem>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        for (var page = 1; page <= 30; page++)
+        {
+            var url = $"{Base}/en/user/library/favorite?page={page}";
+            var html = await GetStringAsync(url, referer: $"{Base}/en", ct: ct);
+            CaptureCsrf(html);
+
+            var rows = ParseFavoriteRows(html);
+            var fresh = rows.Where(r => seen.Add(r.Id)).ToList();
+            if (fresh.Count == 0)
+                break; // empty page or last page repeated → done
+
+            all.AddRange(fresh);
+        }
+
+        return all;
+    }
+
+    private async Task<string> EnsureCsrfAsync(CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(_sessionCsrf))
+        {
+            // Fetch fresh (not cached) so the token matches the CURRENT session.
+            var html = await GetStringAsync($"{Base}/en/midi", referer: $"{Base}/en", cache: false, ct: ct);
+            CaptureCsrf(html);
+        }
+        return _sessionCsrf;
+    }
+
+    private void CaptureCsrf(string html)
+    {
+        var token = ExtractMeta(html, "csrf-token");
+        if (!string.IsNullOrEmpty(token))
+            _sessionCsrf = token;
+    }
+
+    private static List<MidiShowItem> ParseFavoriteRows(string html)
+    {
+        var items = new List<MidiShowItem>();
+        var seen = new HashSet<string>();
+
+        foreach (Match row in Regex.Matches(html, "<tr\\s+data-key=\"\\d+\">(?<body>.*?)</tr>",
+                     RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            var body = row.Groups["body"].Value;
+
+            var hrefMatch = Regex.Match(body, "href=\"(?<href>[^\"]*?/en/midi/[^\"]+)\"", RegexOptions.IgnoreCase);
+            if (!hrefMatch.Success)
+                continue;
+
+            var href = WebUtility.HtmlDecode(hrefMatch.Groups["href"].Value);
+            if (!href.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                href = Base + href;
+
+            var id = Regex.Match(href, "(?<id>\\d+)(?:[/?#][^\"]*)?$").Groups["id"].Value;
+            if (string.IsNullOrEmpty(id) || !seen.Add(id))
+                continue;
+
+            var title = CleanText(Regex.Match(body, "<h6[^>]*>(?<t>.*?)</h6>",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups["t"].Value);
+
+            var uploaderMatch = Regex.Match(body, "/en/u/[^\"]*\"[^>]*title=\"(?<u>[^\"]*)\"", RegexOptions.IgnoreCase);
+            string? uploader = uploaderMatch.Success ? WebUtility.HtmlDecode(uploaderMatch.Groups["u"].Value) : null;
+
+            var thumbMatch = Regex.Match(body, "<img[^>]*src=\"(?<src>[^\"]+)\"", RegexOptions.IgnoreCase);
+            var duration = Regex.Match(body, "<small>\\s*(?<d>\\d{1,2}:\\d{2})\\s*</small>", RegexOptions.IgnoreCase).Groups["d"].Value;
+
+            items.Add(new MidiShowItem
+            {
+                Id = id,
+                PageUrl = href,
+                Title = string.IsNullOrWhiteSpace(title) ? $"MidiShow #{id}" : title,
+                Uploader = uploader,
+                ThumbnailUrl = thumbMatch.Success ? WebUtility.HtmlDecode(thumbMatch.Groups["src"].Value) : null,
+                Duration = duration,
+                IsAccountFavorite = true
+            });
+        }
+
+        return items;
     }
 
     #endregion

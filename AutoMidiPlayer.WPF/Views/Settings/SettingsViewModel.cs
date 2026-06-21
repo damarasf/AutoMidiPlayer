@@ -478,6 +478,24 @@ public class SettingsPageViewModel : Screen
         }
     }
 
+    /// <summary>
+    /// When enabled, favoriting a track in Discover also syncs it to the signed-in MidiShow
+    /// account (and the account's favorites appear in the app). Off by default — favorites stay
+    /// local to this app only.
+    /// </summary>
+    public bool SyncFavoritesToMidiShow
+    {
+        get => Settings.SyncFavoritesToMidiShow;
+        set
+        {
+            if (Settings.SyncFavoritesToMidiShow == value)
+                return;
+
+            Settings.Modify(s => s.SyncFavoritesToMidiShow = value);
+            NotifyOfPropertyChange();
+        }
+    }
+
     public string DefaultSongArtist { get; set; } = Settings.DefaultSongArtist;
 
     public string DefaultSongAlbum { get; set; } = Settings.DefaultSongAlbum;
@@ -595,6 +613,15 @@ public class SettingsPageViewModel : Screen
         if (View is SettingsPageView view)
         {
             view.ScrollToVersionSection();
+        }
+    }
+
+    /// <summary>Resets the Settings tabs to the default (Playback) tab.</summary>
+    public void SelectDefaultTab()
+    {
+        if (View is SettingsPageView view)
+        {
+            view.SelectDefaultTab();
         }
     }
 
@@ -1447,9 +1474,16 @@ public class SettingsPageViewModel : Screen
 
     private bool _isUpdatingTelemetry = false;
 
+    /// <summary>The About view-model, embedded into the "Updates &amp; About" tab.</summary>
+    public AboutViewModel About => _main.AboutView;
+
     protected override void OnActivate()
     {
         Logger.LogPageVisit("Settings", source: "screen-activate");
+
+        // The About content now lives in the Updates &amp; About tab; activate it so its
+        // links / contributors / licenses load (AboutViewModel loads them on activation).
+        ScreenExtensions.TryActivate(About);
 
         if (TelemetryOptIn != Settings.TelemetryOptIn)
         {

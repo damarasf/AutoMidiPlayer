@@ -1,10 +1,22 @@
+using PropertyChanged;
+
 namespace AutoMidiPlayer.WPF.Services.MidiShow;
 
 /// <summary>
 /// A single MIDI entry parsed from a MidiShow list or search results page.
 /// </summary>
+[AddINotifyPropertyChangedInterface]
 public sealed class MidiShowItem
 {
+    /// <summary>True when this track is saved in the local (in-app) favorites.</summary>
+    public bool IsFavorite { get; set; }
+
+    /// <summary>True when this track is favorited on the signed-in MidiShow account.</summary>
+    public bool IsAccountFavorite { get; set; }
+
+    /// <summary>Favorited anywhere (local or account) — drives the filled/red heart.</summary>
+    public bool IsAnyFavorite => IsFavorite || IsAccountFavorite;
+
     /// <summary>Numeric MidiShow id (from the <c>data-key</c> attribute).</summary>
     public string Id { get; init; } = string.Empty;
 

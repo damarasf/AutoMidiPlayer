@@ -240,46 +240,7 @@
         </Style>
     </UserControl.Resources>
 
-    <ScrollViewer helpers:ScrollEdgeFadeBehavior.IsEnabled="True">
-        <controls:SimpleStackPanel Spacing="16">
-            <StackPanel HorizontalAlignment="Center"
-                        Margin="0,32,0,16">
-                <Image Width="64"
-                       Height="64"
-                       Source="pack://application:,,,/Resources/logo.png"
-                       HorizontalAlignment="Center"
-                       Margin="0,0,0,8"/>
-
-                <TextBlock Text="{Binding AppName}"
-                           FontWeight="Bold"
-                           FontSize="24"
-                           TextAlignment="Center"/>
-
-                <TextBlock FontSize="12"
-                           Opacity="0.6"
-                           TextAlignment="Center"
-                           TextWrapping="Wrap"
-                           Margin="0,4,0,0">
-                    <Run Text="Version "/>
-                    <Run Text="{Binding VersionDisplay, Mode=OneTime}"/>
-                </TextBlock>
-
-                <TextBlock Text="A feature-rich MIDI-to-key player for in-game instruments, built with C# and WPF and styled with Windows Mica."
-                           TextWrapping="Wrap"
-                           TextAlignment="Center"
-                           FontSize="12"
-                           Opacity="0.8"
-                           Margin="0,16,0,0"/>
-
-                <TextBlock FontSize="12"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           TextAlignment="Center"
-                           TextWrapping="Wrap"
-                           Margin="0,8,0,0">
-                    <Run Text="If you like the app, consider "/><InlineUIContainer BaselineAlignment="Center"><controls:Hyperlink NavigateUri="https://github.com/Jed556/AutoMidiPlayer/blob/main/CONTRIBUTING.md" Padding="0" Margin="0" BorderThickness="0" Background="Transparent" MinHeight="0"><TextBlock Text="contributing" FontSize="12"/></controls:Hyperlink></InlineUIContainer><Run Text=" or giving a 🌟 star on "/><InlineUIContainer BaselineAlignment="Center"><controls:Hyperlink NavigateUri="https://github.com/Jed556/AutoMidiPlayer" Padding="0" Margin="0" BorderThickness="0" Background="Transparent" MinHeight="0"><TextBlock Text="GitHub" FontSize="12"/></controls:Hyperlink></InlineUIContainer><Run Text=". Thank you~"/>
-                </TextBlock>
-            </StackPanel>
-
+    <controls:SimpleStackPanel Spacing="16">
             <controls:Section Title="Links">
                 <controls:SimpleStackPanel Spacing="8">
                     <ItemsControl ItemsSource="{Binding Links}">
@@ -387,6 +348,5 @@
                     </TextBlock>
                 </controls:SimpleStackPanel>
             </controls:Section>
-        </controls:SimpleStackPanel>
-    </ScrollViewer>
+    </controls:SimpleStackPanel>
 </UserControl>

@@ -40,7 +40,8 @@ public class Bootstrapper : Bootstrapper<MainWindowViewModel>
         ("HoldNotes", "INTEGER NULL"),
         ("Speed", "REAL NULL"),
         ("Bpm", "REAL NULL"),
-        ("BaseKey", "INTEGER NULL")
+        ("BaseKey", "INTEGER NULL"),
+        ("IsFavorite", "INTEGER NOT NULL DEFAULT 0")
     ];
 
     public Bootstrapper()
@@ -159,6 +160,10 @@ public class Bootstrapper : Bootstrapper<MainWindowViewModel>
                 }
             }
 
+            // EnsureCreated() only builds the full schema for a brand-new database, so tables
+            // added later (e.g. OnlineFavorites) must be created explicitly for existing users.
+            EnsureOnlineFavoritesTable(db);
+
             _databaseInitialized = true;
         }
     }
@@ -231,6 +236,23 @@ public class Bootstrapper : Bootstrapper<MainWindowViewModel>
     {
         ExecuteSqlIgnoringErrors(db, $@"
             ALTER TABLE Songs ADD COLUMN {columnName} {sqlType};
+        ");
+    }
+
+    private static void EnsureOnlineFavoritesTable(PlayerContext db)
+    {
+        ExecuteSqlIgnoringErrors(db, @"
+            CREATE TABLE IF NOT EXISTS OnlineFavorites (
+                Id TEXT NOT NULL CONSTRAINT PK_OnlineFavorites PRIMARY KEY,
+                PageUrl TEXT NOT NULL,
+                Title TEXT NOT NULL,
+                Uploader TEXT NULL,
+                ThumbnailUrl TEXT NULL,
+                Standard TEXT NULL,
+                Duration TEXT NULL,
+                Category TEXT NULL,
+                DateAdded TEXT NOT NULL
+            );
         ");
     }
 

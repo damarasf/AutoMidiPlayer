@@ -170,6 +170,19 @@ public partial class SongListControl : UserControl
         remove => RemoveHandler(MenuClickEvent, value);
     }
 
+    /// <summary>
+    /// Raised when the per-row favorite (heart) button is clicked
+    /// </summary>
+    public static readonly RoutedEvent FavoriteClickEvent =
+        EventManager.RegisterRoutedEvent(nameof(FavoriteClick), RoutingStrategy.Bubble,
+            typeof(RoutedEventHandler), typeof(SongListControl));
+
+    public event RoutedEventHandler FavoriteClick
+    {
+        add => AddHandler(FavoriteClickEvent, value);
+        remove => RemoveHandler(FavoriteClickEvent, value);
+    }
+
     #endregion
 
     // Spacing applied only when the scrollbar is visible
@@ -334,6 +347,15 @@ public partial class SongListControl : UserControl
         if (sender is System.Windows.Controls.Button button && button.Tag is MidiFile file)
         {
             RaiseEvent(new SongListEventArgs(PlayPauseClickEvent, this, file));
+            e.Handled = true;
+        }
+    }
+
+    private void FavoriteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button { Tag: MidiFile file })
+        {
+            RaiseEvent(new SongListEventArgs(FavoriteClickEvent, this, file));
             e.Handled = true;
         }
     }

@@ -461,7 +461,7 @@
                                              ColorMode="Accent"
                                              Icon="ArrowDownload16"
                                              IconFontSize="18"
-                                             Command="{s:Action NavigateToSettings}"
+                                             Command="{s:Action NavigateToSettingsUpdates}"
                                              ToolTip="Update available"
                                              Visibility="{Binding ShowUpdate, Converter={x:Static s:BoolToVisibilityConverter.Instance}}"
                                              Margin="0,0,6,0"
@@ -476,13 +476,14 @@
                                              Margin="0,0,8,0"
                                              shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
 
+                            <!-- Settings (also hosts About in its 'Updates & About' tab) -->
                             <controls:Button Variant="Ghost"
-                                             Icon="Info24"
+                                             Icon="Settings16"
                                              IconFontSize="18"
-                                             Command="{s:Action NavigateToAbout}"
-                                             ToolTip="About Auto MIDI Player"
+                                             Command="{s:Action NavigateToSettings}"
+                                             ToolTip="Settings"
                                              Padding="8,4"
-                                             Margin="0,0,8,0"
+                                             Margin="0,0,14,0"
                                              shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
 
                             <!-- Let's have a pin / always on top button some time here -->
@@ -609,10 +610,8 @@
                                                    Style="{StaticResource GameDrawerNavigationItemStyle}"
                                                    Loaded="GameDrawerItem_Loaded"
                                                    Click="{s:Action ToggleGameSelector}"/>
-                            <ui:NavigationViewItem Content="Settings"
-                                                   Icon="{ui:SymbolIcon Settings16}"
-                                                   Tag="{Binding SettingsView}"
-                                                   Click="{s:Action NavigateToItem}"/>
+                            <!-- Settings moved to the title bar (next to Theme/About) for a consistent
+                                 "app controls" cluster. NavigateToSettings handles selection. -->
                         </ui:NavigationView.FooterMenuItems>
                     </ui:NavigationView>
 

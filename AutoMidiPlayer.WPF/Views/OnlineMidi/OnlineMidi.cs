@@ -51,6 +51,16 @@ public partial class OnlineMidiView : UserControl
             _ = vm.PreviewAsync(item);
     }
 
+    // Per-card favorite heart (local by default; also syncs to the account when enabled in Settings).
+    private void Favorite_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm && sender is FrameworkElement { DataContext: MidiShowItem item })
+            _ = vm.ToggleFavorite(item);
+    }
+
+    // Detail-panel favorite heart (operates on the currently open track).
+    private void DetailFavorite_Click(object sender, RoutedEventArgs e) => _ = ViewModel?.ToggleFavoriteSelected();
+
     private void PreviewSeek_DragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
         => ViewModel?.BeginPreviewScrub();
 

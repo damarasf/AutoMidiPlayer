@@ -324,15 +324,9 @@ public class MainWindowViewModel : Conductor<IScreen>, IHandle<MidiFile>
     {
         if (ActiveItem == SettingsView) return;
 
-        // Find the Settings navigation item and set it as active
-        var settingsNavItem = Navigation?.FooterMenuItems
-            .OfType<NavigationViewItem>()
-            .FirstOrDefault(nav => nav.Tag == SettingsView);
-        if (settingsNavItem != null)
-        {
-            SetSelectedNavItem(settingsNavItem);
-        }
-
+        // Settings is opened from the title bar (not a nav item), so clear the nav selection
+        // — same as About.
+        SetSelectedNavItem(null);
         ActivateItem(SettingsView);
 
         // Update breadcrumb with current page name
@@ -343,14 +337,24 @@ public class MainWindowViewModel : Conductor<IScreen>, IHandle<MidiFile>
         // Notify that ShowUpdate property may have changed
         NotifyOfPropertyChange(() => ShowUpdate);
 
-        // Scroll to Version section when coming from update button
-        // Defer with a small delay to ensure view is fully activated and rendered
+        // Always open on the default (Playback) tab.
+        var dispatcher = (View as FrameworkElement)?.Dispatcher ?? System.Windows.Application.Current?.Dispatcher;
+        dispatcher?.InvokeAsync(
+            () => SettingsView.SelectDefaultTab(),
+            System.Windows.Threading.DispatcherPriority.Normal);
+
+        Logger.LogPageVisit("Settings", source: "programmatic-navigation");
+    }
+
+    /// <summary>Opens Settings on the "Updates &amp; About" tab (used by the update-available button).</summary>
+    public void NavigateToSettingsUpdates()
+    {
+        NavigateToSettings();
+
         var dispatcher = (View as FrameworkElement)?.Dispatcher ?? System.Windows.Application.Current?.Dispatcher;
         dispatcher?.InvokeAsync(
             () => SettingsView.ScrollToVersionSection(),
             System.Windows.Threading.DispatcherPriority.Normal);
-
-        Logger.LogPageVisit("Settings", source: "programmatic-navigation");
     }
 
     public void NavigateToSongs()

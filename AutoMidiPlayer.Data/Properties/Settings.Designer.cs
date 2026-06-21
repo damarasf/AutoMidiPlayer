@@ -150,7 +150,19 @@ namespace AutoMidiPlayer.Data.Properties {
                 this["AutoEnableListenMode"] = value;
             }
         }
-        
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool SyncFavoritesToMidiShow {
+            get {
+                return ((bool)(this["SyncFavoritesToMidiShow"]));
+            }
+            set {
+                this["SyncFavoritesToMidiShow"] = value;
+            }
+        }
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]

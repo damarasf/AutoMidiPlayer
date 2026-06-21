@@ -86,6 +86,15 @@ public partial class SongsView : UserControl
     }
 
     /// <summary>
+    /// Toggle the favorite flag from the per-row heart button
+    /// </summary>
+    private async void TrackList_FavoriteClick(object sender, RoutedEventArgs e)
+    {
+        if (e is SongListEventArgs args && DataContext is SongsViewModel viewModel)
+            await viewModel.ToggleFavorite(args.File);
+    }
+
+    /// <summary>
     /// Edit selected song (single selection only)
     /// </summary>
     private async void EditSong_Click(object sender, RoutedEventArgs e)

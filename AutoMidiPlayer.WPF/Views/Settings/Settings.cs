@@ -46,17 +46,16 @@ public partial class SettingsPageView : UserControl
 
     public void ScrollToVersionSection()
     {
-        if (VersionSection is null || RootScrollViewer is null) return;
+        // Settings are now grouped into tabs; the Version/update info lives on the
+        // "Updates & About" tab, so switch to it instead of scrolling.
+        if (SettingsTabs is not null && UpdatesTab is not null)
+            SettingsTabs.SelectedItem = UpdatesTab;
+    }
 
-        // Defer scroll to ensure layout is complete
-        Dispatcher.InvokeAsync(
-            () =>
-            {
-                // Get the position of Version section relative to the scroll viewer
-                var transform = VersionSection.TranslatePoint(new System.Windows.Point(0, 0), RootScrollViewer);
-                // Scroll to position it near the top (with some padding), not just barely in view
-                RootScrollViewer.ScrollToVerticalOffset(transform.Y - 100);
-            },
-            System.Windows.Threading.DispatcherPriority.Render);
+    /// <summary>Selects the default (Playback) tab — used when opening Settings normally.</summary>
+    public void SelectDefaultTab()
+    {
+        if (SettingsTabs is not null)
+            SettingsTabs.SelectedIndex = 0;
     }
 }

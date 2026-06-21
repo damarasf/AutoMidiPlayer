@@ -32,6 +32,19 @@ public class MidiFile : Screen
         set => SetAndNotify(ref _position, value);
     }
 
+    /// <summary>Favorite flag, mirrored from the underlying <see cref="Song"/> (notifies for binding).</summary>
+    public bool IsFavorite
+    {
+        get => Song.IsFavorite;
+        set
+        {
+            if (Song.IsFavorite == value)
+                return;
+            Song.IsFavorite = value;
+            NotifyOfPropertyChange();
+        }
+    }
+
     public Melanchall.DryWetMidi.Core.MidiFile Midi { get; private set; } = null!;
 
     /// <summary>

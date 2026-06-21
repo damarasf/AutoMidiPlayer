@@ -86,7 +86,7 @@
                 <TextBlock Margin="10,0"
                            VerticalAlignment="Center"
                            Opacity="0.7">
-                    <Run Text="{Binding Tracks.Count, Mode=OneWay}"/> songs
+                    <Run Text="{Binding SortedTracks.Count, Mode=OneWay}"/> songs
                 </TextBlock>
             </controls:SimpleStackPanel>
 
@@ -94,6 +94,24 @@
             <controls:SimpleStackPanel Grid.Column="1"
                                        Orientation="Horizontal"
                                        Spacing="8">
+                <!-- Favorites-only filter -->
+                <ui:Button Padding="10,6"
+                           VerticalAlignment="Center"
+                           ToolTip="Show favorites only"
+                           Command="{s:Action ToggleFavoritesOnly}">
+                    <ui:Button.Style>
+                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                            <Setter Property="Appearance" Value="Secondary"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowFavoritesOnly}" Value="True">
+                                    <Setter Property="Appearance" Value="Primary"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ui:Button.Style>
+                    <ui:SymbolIcon Symbol="Heart12" FontSize="15" Filled="{Binding ShowFavoritesOnly}"/>
+                </ui:Button>
+
                 <!-- Sort Dropdown -->
                 <button:StandardDropdown HorizontalAlignment="Left"
                                          ItemsSource="{x:Static viewModels:SongsViewModel.SortModeOptions}"
@@ -121,6 +139,7 @@
                                   AllowReorder="{Binding IsCustomSort}"
                                   ItemDoubleClick="TrackList_ItemDoubleClick"
                                   PlayPauseClick="TrackList_PlayPauseClick"
+                                  FavoriteClick="TrackList_FavoriteClick"
                                   MenuClick="TrackList_MenuClick">
             <controls:SongListControl.ItemContextMenu>
                 <ContextMenu>

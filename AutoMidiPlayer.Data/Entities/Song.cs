@@ -39,6 +39,9 @@ public class Song
 
     public DateTime? DateAdded { get; set; }
 
+    /// Whether the user marked this song as a favorite.
+    public bool IsFavorite { get; set; }
+
     public Transpose? Transpose { get; set; } = Entities.Transpose.Ignore;
 
     /// Playback speed (0.1 to 4.0).

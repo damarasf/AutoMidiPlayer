@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using System.Windows.Media;
+using AutoMidiPlayer.Data;
 using AutoMidiPlayer.Data.Entities;
 using AutoMidiPlayer.Data.Properties;
 using AutoMidiPlayer.WPF.Dialogs;
@@ -167,6 +168,40 @@ public class SongsViewModel : Screen
 
     public string SearchText { get; set; } = string.Empty;
 
+    /// <summary>When true, the list shows only songs marked as favorite.</summary>
+    public bool ShowFavoritesOnly { get; set; }
+
+    public void OnShowFavoritesOnlyChanged() => ApplySort();
+
+    public void ToggleFavoritesOnly() => ShowFavoritesOnly = !ShowFavoritesOnly;
+
+    /// <summary>Toggles the favorite flag on a song and persists it.</summary>
+    public async Task ToggleFavorite(MidiFile? file)
+    {
+        if (file is null)
+            return;
+
+        file.IsFavorite = !file.IsFavorite;
+
+        try
+        {
+            await using var db = _ioc.Get<PlayerContext>();
+            db.Songs.Update(file.Song);
+            await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogException(ex);
+            // Revert the optimistic toggle if persistence failed.
+            file.IsFavorite = !file.IsFavorite;
+            return;
+        }
+
+        // If filtering to favorites only, an unfavorited song should drop out of the list.
+        if (ShowFavoritesOnly)
+            ApplySort();
+    }
+
     public SortMode CurrentSortMode { get; set; } = SortMode.CustomOrder;
 
     public bool IsAscending { get; set; } = true;
@@ -252,6 +287,10 @@ public class SongsViewModel : Screen
                 t.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
                 || (!string.IsNullOrWhiteSpace(t.Song.Album) && t.Song.Album.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
                 || (!string.IsNullOrWhiteSpace(t.Song.Artist) && t.Song.Artist.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
+
+        // Favorites-only filter
+        if (ShowFavoritesOnly)
+            filtered = filtered.Where(t => t.Song.IsFavorite);
 
         // Then, apply sorting
         IEnumerable<MidiFile> sorted = CurrentSortMode switch
