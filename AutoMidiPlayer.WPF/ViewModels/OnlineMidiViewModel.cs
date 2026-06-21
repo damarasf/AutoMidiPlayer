@@ -689,9 +689,12 @@ public sealed class OnlineMidiViewModel : Screen
             }
             finally
             {
+                // Only the current (newest) load owns the busy state (matches the browse path).
                 if (_loadCts == cts)
+                {
                     _loadCts = null;
-                SetBusy(false);
+                    SetBusy(false);
+                }
             }
             return;
         }

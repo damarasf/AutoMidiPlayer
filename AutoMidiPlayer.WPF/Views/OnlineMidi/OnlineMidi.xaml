@@ -477,38 +477,6 @@
 
         <!-- ============ Results ============ -->
         <Grid Grid.Row="2">
-            <!-- Virtualized so only the visible cards are realized; each card is a fairly heavy
-                 visual tree, and paging rebuilds the whole list. -->
-            <ListBox ItemsSource="{Binding Results}"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     Padding="0,0,8,0"
-                     HorizontalContentAlignment="Stretch"
-                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                     VirtualizingPanel.IsVirtualizing="True"
-                     VirtualizingPanel.VirtualizationMode="Recycling"
-                     VirtualizingPanel.ScrollUnit="Pixel"
-                     VirtualizingPanel.CacheLength="1"
-                     VirtualizingPanel.CacheLengthUnit="Page">
-                <ListBox.ItemContainerStyle>
-                    <!-- Strip all ListBoxItem chrome (selection/hover highlight, padding); the card
-                         draws its own hover state and the items aren't meant to be "selected". -->
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="Margin" Value="0"/>
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        <Setter Property="Focusable" Value="False"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ListBoxItem">
-                                    <ContentPresenter/>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </ListBox.ItemContainerStyle>
-                    <ListBox.ItemTemplate>
             <!-- Virtualized so only the visible cards are realized — the favorites view can hold
                  hundreds of items, and each card is a fairly heavy visual tree. -->
             <ListBox ItemsSource="{Binding Results}"
