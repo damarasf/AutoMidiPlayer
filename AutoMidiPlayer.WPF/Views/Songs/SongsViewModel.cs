@@ -186,7 +186,10 @@ public class SongsViewModel : Screen
         try
         {
             await using var db = _ioc.Get<PlayerContext>();
-            db.Songs.Update(file.Song);
+            // Persist only the IsFavorite column. Entry() attaches the (detached) entity as
+            // Unchanged, then we flag just that one property — avoids Update() marking the whole
+            // row dirty and writing every column on each toggle.
+            db.Entry(file.Song).Property(s => s.IsFavorite).IsModified = true;
             await db.SaveChangesAsync();
         }
         catch (Exception ex)
@@ -197,9 +200,13 @@ public class SongsViewModel : Screen
             return;
         }
 
-        // If filtering to favorites only, an unfavorited song should drop out of the list.
-        if (ShowFavoritesOnly)
-            ApplySort();
+        // In the favorites-only view, an unfavorited song drops out. Remove just that one row
+        // instead of re-filtering/sorting and rebuilding the entire list.
+        if (ShowFavoritesOnly && !file.IsFavorite)
+        {
+            SortedTracks.Remove(file);
+            RefreshPositions();
+        }
     }
 
     public SortMode CurrentSortMode { get; set; } = SortMode.CustomOrder;

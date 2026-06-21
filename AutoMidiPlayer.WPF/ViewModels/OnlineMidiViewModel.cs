@@ -642,7 +642,9 @@ public sealed class OnlineMidiViewModel : Screen
         var cts = new CancellationTokenSource();
         _loadCts = cts;
 
-        // Favorites view: merge local favorites with the account's favorites (no pagination/search).
+        // Favorites view: show local favorites immediately, then merge in the account's
+        // favorites once they arrive — fetching those pages the server and can be slow, so we
+        // don't make the user stare at a spinner with their local favorites hidden behind it.
         if (ShowFavoritesOnly)
         {
             SetBusy(true);
@@ -653,34 +655,61 @@ public sealed class OnlineMidiViewModel : Screen
                 foreach (var local in (await _favorites.GetAllAsync()).Select(ToItem))
                     byId[local.Id] = local;
 
-                if (IsSignedIn && SyncFavoritesEnabled)
+                if (cts.IsCancellationRequested || _loadCts != cts)
+                    return;
+
+                // Render local favorites now and drop the blocking spinner so they're interactive.
+                Results.Clear();
+                Results.AddRange(byId.Values);
+                SetBusy(false);
+
+                var willSync = IsSignedIn && SyncFavoritesEnabled;
+                StatusMessage = byId.Count == 0
+                    ? (willSync ? "Loading your MidiShow favorites..." : "No favorites yet. Use the heart on a track to save it.")
+                    : (willSync
+                        ? $"Showing {byId.Count} local favorite{(byId.Count == 1 ? "" : "s")}; syncing MidiShow..."
+                        : $"Showing {byId.Count} favorite{(byId.Count == 1 ? "" : "s")}.");
+
+                if (willSync)
                 {
                     try
                     {
                         var accountFavs = await GetAccountFavoritesAsync(cts.Token);
+
+                        if (cts.IsCancellationRequested || _loadCts != cts)
+                            return;
+
+                        // Mark dual favorites in place; append account-only ones in a single batch.
+                        var extras = new List<MidiShowItem>();
                         foreach (var acc in accountFavs)
                         {
                             if (byId.TryGetValue(acc.Id, out var existing))
                                 existing.IsAccountFavorite = true; // favorited both places
                             else
+                            {
                                 byId[acc.Id] = acc;                 // account-only favorite
+                                extras.Add(acc);
+                            }
                         }
+                        if (extras.Count > 0)
+                            Results.AddRange(extras);
+
+                        StatusMessage = byId.Count == 0
+                            ? "No favorites yet. Use the heart on a track to save it."
+                            : $"Showing {byId.Count} favorite{(byId.Count == 1 ? "" : "s")}.";
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return; // superseded by a newer load
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogException(ex); // show local favorites even if account fetch fails
+                        Logger.LogException(ex); // keep local favorites even if the account fetch fails
+                        StatusMessage = byId.Count == 0
+                            ? "Couldn't load your MidiShow favorites."
+                            : $"Showing {byId.Count} favorite{(byId.Count == 1 ? "" : "s")} (MidiShow sync failed).";
                     }
                 }
-
-                if (cts.IsCancellationRequested)
-                    return;
-
-                Results.Clear();
-                Results.AddRange(byId.Values);
-
-                StatusMessage = byId.Count == 0
-                    ? "No favorites yet. Use the heart on a track to save it."
-                    : $"Showing {byId.Count} favorite{(byId.Count == 1 ? "" : "s")}.";
             }
             catch (Exception ex)
             {
