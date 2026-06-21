@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMidiPlayer.Data;
+using AutoMidiPlayer.Data.Entities;
+using AutoMidiPlayer.Data.Properties;
 using AutoMidiPlayer.WPF.Controls.Snackbar;
 using AutoMidiPlayer.WPF.Services.MidiShow;
 using JetBrains.Annotations;
@@ -26,6 +29,21 @@ public sealed class OnlineMidiViewModel : Screen
     private readonly IContainer _ioc;
     private readonly MainWindowViewModel _main;
     private readonly MidiShowClient _client = new();
+    private static readonly Settings Settings = Settings.Default;
+    private readonly OnlineFavoritesService _favorites;
+    private HashSet<string> _favoriteIds = new();
+    private HashSet<string> _accountFavoriteIds = new();
+
+    /// <summary>
+    /// The signed-in account's full favorites list, cached in memory for the session. Fetching it
+    /// hits up to 30 pages serially (paced), so we keep it instead of re-fetching every time the
+    /// favorites view opens. Null = not loaded / invalidated (sign-in, sign-out, settings change).
+    /// Toggling an account favorite updates this list in place so it stays valid.
+    /// </summary>
+    private List<MidiShowItem>? _accountFavorites;
+
+    /// <summary>Whether Discover favorites also sync to the MidiShow account (Settings, off by default).</summary>
+    private static bool SyncFavoritesEnabled => Settings.SyncFavoritesToMidiShow;
 
     private bool _initialized;
     private CancellationTokenSource? _loadCts;
@@ -34,6 +52,7 @@ public sealed class OnlineMidiViewModel : Screen
     {
         _ioc = ioc;
         _main = main;
+        _favorites = new OnlineFavoritesService(ioc);
         _preview.Finished += OnPreviewFinished;
 
         // Preview and the main player both render through the same Windows synth, so they
@@ -41,6 +60,39 @@ public sealed class OnlineMidiViewModel : Screen
         // (releasing its synth device) — otherwise the preview dies mid-play and its device
         // is left in a bad state, breaking the next preview.
         _main.PlaybackControls.PlaybackStateChanged += OnMainPlaybackStateChanged;
+
+        // React when the user toggles the "sync favorites to MidiShow account" setting.
+        _main.SettingsView.PropertyChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(SettingsPageViewModel.SyncFavoritesToMidiShow))
+            return;
+
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+            _ = OnSyncFavoritesSettingChanged();
+        else
+            dispatcher.Invoke(() => _ = OnSyncFavoritesSettingChanged());
+    }
+
+    private async Task OnSyncFavoritesSettingChanged()
+    {
+        if (SyncFavoritesEnabled)
+        {
+            // Turned on: pull the account's favorites and reflect them on the current results.
+            await RefreshAccountFavoritesAsync();
+        }
+        else
+        {
+            // Turned off: forget account-favorite state (local favorites are untouched).
+            _accountFavoriteIds = new();
+            foreach (var item in Results)
+                item.IsAccountFavorite = false;
+            if (ShowFavoritesOnly)
+                await LoadAsync();
+        }
     }
 
     private void OnMainPlaybackStateChanged(object? sender, EventArgs e)
@@ -139,6 +191,7 @@ public sealed class OnlineMidiViewModel : Screen
         // is no reason to make the user wait for the login round-trips before seeing content.
         // (LoginAsync starts from a fresh session anyway, so the anonymous browse cookies don't
         // interfere.) The "signed in" badge updates a moment after the list renders.
+        _favoriteIds = await _favorites.LoadIdsAsync();
         await LoadAsync();
         await TrySignInFromStoreAsync();
     }
@@ -156,6 +209,8 @@ public sealed class OnlineMidiViewModel : Screen
         {
             var success = await _client.LoginAsync(credentials.Username, credentials.Password);
             SetSignedIn(success, credentials.Username);
+            if (success)
+                await RefreshAccountFavoritesAsync();
         }
         catch (Exception ex)
         {
@@ -197,6 +252,9 @@ public sealed class OnlineMidiViewModel : Screen
                 IsAccountFlyoutOpen = false;
 
                 SnackbarService.Success("Signed in", $"Connected to MidiShow as {username}.");
+
+                // Reflect the account's existing favorites on the current results (background).
+                _ = RefreshAccountFavoritesAsync();
             }
             else
             {
@@ -225,6 +283,13 @@ public sealed class OnlineMidiViewModel : Screen
         MidiShowCredentialStore.Clear();
         SetSignedIn(false, string.Empty);
         IsAccountFlyoutOpen = false;
+
+        // Clear account-favorite state (local favorites are untouched).
+        _accountFavorites = null;
+        _accountFavoriteIds = new();
+        foreach (var item in Results)
+            item.IsAccountFavorite = false;
+
         SnackbarService.Info("Signed out", "Your MidiShow credentials were removed from this device.");
     }
 
@@ -248,6 +313,8 @@ public sealed class OnlineMidiViewModel : Screen
 
     public async Task Search()
     {
+        ExitFavoritesView();
+
         // A keyword search spans all categories, so reset the category filter.
         if (!string.IsNullOrEmpty(SelectedCategorySlug))
         {
@@ -263,6 +330,8 @@ public sealed class OnlineMidiViewModel : Screen
     /// <summary>Browses a MidiShow category (clears any keyword search).</summary>
     public async Task SetCategory(string slug, string name)
     {
+        ExitFavoritesView();
+
         SelectedCategorySlug = slug ?? "";
         SelectedCategoryName = string.IsNullOrEmpty(name) ? "All categories" : name;
 
@@ -291,8 +360,10 @@ public sealed class OnlineMidiViewModel : Screen
     public async Task SetSort(string? key)
     {
         var newKey = key ?? "";
-        if (newKey == SortKey)
+        if (newKey == SortKey && !ShowFavoritesOnly)
             return;
+
+        ExitFavoritesView();
 
         SortKey = newKey;
         NotifyOfPropertyChange(nameof(SortKey));
@@ -340,11 +411,286 @@ public sealed class OnlineMidiViewModel : Screen
         await LoadAsync();
     }
 
+    #region Favorites (local)
+
+    /// <summary>When true, the Discover list shows locally-saved favorites instead of MidiShow.</summary>
+    public bool ShowFavoritesOnly { get; private set; }
+
+    /// <summary>Pagination is hidden while viewing favorites (the local list isn't paged).</summary>
+    public bool ShowPagination => !ShowFavoritesOnly;
+
+    public async Task ToggleFavoritesOnly()
+    {
+        if (IsBusy)
+            return;
+
+        ShowFavoritesOnly = !ShowFavoritesOnly;
+        NotifyOfPropertyChange(nameof(ShowFavoritesOnly));
+        NotifyOfPropertyChange(nameof(ShowPagination));
+
+        // The favorites view ignores the search box — clear it so it isn't misleading.
+        if (ShowFavoritesOnly && !string.IsNullOrEmpty(SearchQuery))
+        {
+            SearchQuery = string.Empty;
+            NotifyOfPropertyChange(nameof(SearchQuery));
+        }
+
+        CurrentPage = 1;
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// The heart button's single action: always toggles the LOCAL favorite, and also syncs to the
+    /// MidiShow account when the user enabled that in Settings (and is signed in).
+    /// </summary>
+    public async Task ToggleFavorite(MidiShowItem item)
+    {
+        if (item is null)
+            return;
+
+        var add = !item.IsAnyFavorite; // favorited anywhere → remove; otherwise add
+        var syncing = SyncFavoritesEnabled && IsSignedIn;
+
+        if (item.IsFavorite != add)
+            await FavoriteLocalAsync(item);
+
+        if (syncing && item.IsAccountFavorite != add)
+            await FavoriteAccountAsync(item);
+    }
+
+    public Task ToggleFavoriteSelected()
+        => _detailItem is null ? Task.CompletedTask : ToggleFavorite(_detailItem);
+
+    /// <summary>Toggles the LOCAL (in-app) favorite for a track.</summary>
+    private async Task FavoriteLocalAsync(MidiShowItem item)
+    {
+        if (item is null)
+            return;
+
+        try
+        {
+            if (item.IsFavorite)
+            {
+                await _favorites.RemoveAsync(item.Id);
+                _favoriteIds.Remove(item.Id);
+                item.IsFavorite = false;
+            }
+            else
+            {
+                await _favorites.AddAsync(item);
+                _favoriteIds.Add(item.Id);
+                item.IsFavorite = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogException(ex);
+            SnackbarService.Danger("Favorites", "Could not update your local favorites.");
+            return;
+        }
+
+        AfterFavoriteChange(item);
+    }
+
+    /// <summary>Toggles the favorite on the signed-in MidiShow ACCOUNT (server-side).</summary>
+    private async Task FavoriteAccountAsync(MidiShowItem item)
+    {
+        if (item is null)
+            return;
+
+        if (!IsSignedIn)
+        {
+            SnackbarService.Warning("Sign in required", "Sign in with your MidiShow account to favorite on MidiShow.");
+            return;
+        }
+
+        var add = !item.IsAccountFavorite;
+        try
+        {
+            var ok = await _client.SetFavoriteAsync(item.Id, add);
+            if (!ok)
+            {
+                SnackbarService.Danger("MidiShow favorites", "MidiShow didn't accept the change. Try again.");
+                return;
+            }
+        }
+        catch (MidiShowException ex)
+        {
+            if (ex.Reason == MidiShowDownloadError.NotAuthenticated)
+                SetSignedIn(false, SignedInUser);
+            SnackbarService.Danger("MidiShow favorites", ex.Message);
+            return;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogException(ex);
+            SnackbarService.Danger("MidiShow favorites", "Could not update your MidiShow favorites.");
+            return;
+        }
+
+        item.IsAccountFavorite = add;
+        if (add) _accountFavoriteIds.Add(item.Id);
+        else _accountFavoriteIds.Remove(item.Id);
+
+        // Keep the cached account-favorites list in step so the favorites view doesn't re-page.
+        if (_accountFavorites is not null)
+        {
+            if (add)
+            {
+                if (_accountFavorites.All(f => f.Id != item.Id))
+                    _accountFavorites.Add(item);
+            }
+            else
+            {
+                _accountFavorites.RemoveAll(f => f.Id == item.Id);
+            }
+        }
+
+        AfterFavoriteChange(item);
+    }
+
+    private void AfterFavoriteChange(MidiShowItem item)
+    {
+        // In the favorites view, a track that's no longer favorited anywhere drops out.
+        if (ShowFavoritesOnly && !item.IsAnyFavorite)
+            Results.Remove(item);
+
+        NotifyOfPropertyChange(nameof(SelectedDetailIsFavorite));
+        NotifyOfPropertyChange(nameof(HasResults));
+        NotifyOfPropertyChange(nameof(ShowEmptyState));
+    }
+
+    /// <summary>
+    /// Returns the account's favorites, fetching once and caching for the session. Subsequent calls
+    /// (e.g. opening the favorites view) reuse the cache instead of re-paging the server.
+    /// </summary>
+    private async Task<List<MidiShowItem>> GetAccountFavoritesAsync(CancellationToken ct = default)
+    {
+        if (_accountFavorites is not null)
+            return _accountFavorites;
+
+        var favs = await _client.GetAccountFavoritesAllAsync(ct);
+        _accountFavorites = favs;
+        _accountFavoriteIds = favs.Select(f => f.Id).ToHashSet(StringComparer.Ordinal);
+        return favs;
+    }
+
+    /// <summary>Loads the account's favorite ids and reflects them on the current results.</summary>
+    private async Task RefreshAccountFavoritesAsync()
+    {
+        if (!IsSignedIn || !SyncFavoritesEnabled)
+        {
+            _accountFavorites = null;
+            _accountFavoriteIds = new();
+            return;
+        }
+
+        try
+        {
+            _accountFavorites = null; // force a fresh fetch (sign-in / settings change)
+            await GetAccountFavoritesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogException(ex);
+            return;
+        }
+
+        foreach (var item in Results)
+            item.IsAccountFavorite = _accountFavoriteIds.Contains(item.Id);
+
+        // If the favorites view is open, rebuild it so account favorites appear immediately.
+        if (ShowFavoritesOnly)
+            await LoadAsync();
+    }
+
+    /// <summary>Favorite state of the track currently open in the detail panel (drives the heart).</summary>
+    public bool SelectedDetailIsFavorite => _detailItem?.IsAnyFavorite ?? false;
+
+    private void ExitFavoritesView()
+    {
+        if (!ShowFavoritesOnly)
+            return;
+
+        ShowFavoritesOnly = false;
+        NotifyOfPropertyChange(nameof(ShowFavoritesOnly));
+        NotifyOfPropertyChange(nameof(ShowPagination));
+    }
+
+    private static MidiShowItem ToItem(OnlineFavorite f) => new()
+    {
+        Id = f.Id,
+        PageUrl = f.PageUrl,
+        Title = f.Title,
+        Uploader = f.Uploader,
+        ThumbnailUrl = f.ThumbnailUrl,
+        Standard = f.Standard,
+        Duration = f.Duration ?? "",
+        Category = f.Category ?? "",
+        IsFavorite = true
+    };
+
+    #endregion
+
     private async Task LoadAsync()
     {
         _loadCts?.Cancel();
         var cts = new CancellationTokenSource();
         _loadCts = cts;
+
+        // Favorites view: merge local favorites with the account's favorites (no pagination/search).
+        if (ShowFavoritesOnly)
+        {
+            SetBusy(true);
+            StatusMessage = "Loading favorites...";
+            try
+            {
+                var byId = new Dictionary<string, MidiShowItem>(StringComparer.Ordinal);
+                foreach (var local in (await _favorites.GetAllAsync()).Select(ToItem))
+                    byId[local.Id] = local;
+
+                if (IsSignedIn && SyncFavoritesEnabled)
+                {
+                    try
+                    {
+                        var accountFavs = await GetAccountFavoritesAsync(cts.Token);
+                        foreach (var acc in accountFavs)
+                        {
+                            if (byId.TryGetValue(acc.Id, out var existing))
+                                existing.IsAccountFavorite = true; // favorited both places
+                            else
+                                byId[acc.Id] = acc;                 // account-only favorite
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogException(ex); // show local favorites even if account fetch fails
+                    }
+                }
+
+                if (cts.IsCancellationRequested)
+                    return;
+
+                Results.Clear();
+                Results.AddRange(byId.Values);
+
+                StatusMessage = byId.Count == 0
+                    ? "No favorites yet. Use the heart on a track to save it."
+                    : $"Showing {byId.Count} favorite{(byId.Count == 1 ? "" : "s")}.";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogException(ex);
+                StatusMessage = "Could not load your favorites.";
+            }
+            finally
+            {
+                if (_loadCts == cts)
+                    _loadCts = null;
+                SetBusy(false);
+            }
+            return;
+        }
 
         var isSearch = !string.IsNullOrWhiteSpace(SearchQuery);
         SetBusy(true);
@@ -360,6 +706,13 @@ public sealed class OnlineMidiViewModel : Screen
 
             if (cts.IsCancellationRequested)
                 return;
+
+            // Reflect existing local + account favorites on the freshly-loaded items.
+            foreach (var item in items)
+            {
+                item.IsFavorite = _favoriteIds.Contains(item.Id);
+                item.IsAccountFavorite = _accountFavoriteIds.Contains(item.Id);
+            }
 
             Results.Clear();
             Results.AddRange(items);

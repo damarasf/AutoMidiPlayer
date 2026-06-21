@@ -14,6 +14,7 @@
 
     <UserControl.Resources>
         <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+        <converters:UrlToCachedImageConverter x:Key="UrlToCachedImageConverter"/>
 
         <!-- Icons inside buttons don't inherit the button foreground in this app, so they
              default to the accent (green). Force a neutral foreground; icons that need a
@@ -163,6 +164,27 @@
                        Command="{s:Action Reload}">
                 <ui:SymbolIcon Symbol="ArrowSync24"
                                FontSize="16"/>
+            </ui:Button>
+
+            <ui:Button Margin="8,0,0,0"
+                       Padding="12,7"
+                       VerticalAlignment="Center"
+                       ToolTip="Show your favorites"
+                       Command="{s:Action ToggleFavoritesOnly}">
+                <ui:Button.Style>
+                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                        <Setter Property="Appearance" Value="Secondary"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ShowFavoritesOnly}" Value="True">
+                                <Setter Property="Appearance" Value="Primary"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ui:Button.Style>
+                <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Symbol="Heart12" FontSize="16" Margin="0,0,7,0" Filled="{Binding ShowFavoritesOnly}"/>
+                    <TextBlock VerticalAlignment="Center" Text="Favorites"/>
+                </StackPanel>
             </ui:Button>
             </StackPanel>
 
@@ -455,10 +477,38 @@
 
         <!-- ============ Results ============ -->
         <Grid Grid.Row="2">
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          Padding="0,0,8,0">
-                <ItemsControl ItemsSource="{Binding Results}">
-                    <ItemsControl.ItemTemplate>
+            <!-- Virtualized so only the visible cards are realized — the favorites view can hold
+                 hundreds of items, and each card is a fairly heavy visual tree. -->
+            <ListBox ItemsSource="{Binding Results}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     Padding="0,0,8,0"
+                     HorizontalContentAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     VirtualizingPanel.ScrollUnit="Pixel"
+                     VirtualizingPanel.CacheLength="1"
+                     VirtualizingPanel.CacheLengthUnit="Page">
+                <ListBox.ItemContainerStyle>
+                    <!-- Strip all ListBoxItem chrome (selection/hover highlight, padding); the card
+                         draws its own hover state and the items aren't meant to be "selected". -->
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Focusable" Value="False"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter/>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type midishow:MidiShowItem}">
                             <Border Style="{StaticResource ResultCard}">
                                 <Grid>
@@ -476,7 +526,7 @@
                                         <Ellipse Fill="{ui:ThemeResource ControlFillColorSecondaryBrush}"/>
                                         <Ellipse>
                                             <Ellipse.Fill>
-                                                <ImageBrush ImageSource="{Binding ThumbnailUrl}" Stretch="UniformToFill"/>
+                                                <ImageBrush ImageSource="{Binding ThumbnailUrl, Converter={StaticResource UrlToCachedImageConverter}}" Stretch="UniformToFill"/>
                                             </Ellipse.Fill>
                                         </Ellipse>
                                         <ui:SymbolIcon Symbol="MusicNote224" FontSize="18" Opacity="0.5"
@@ -549,14 +599,30 @@
                                         <StackPanel Orientation="Horizontal"
                                                     VerticalAlignment="Center" HorizontalAlignment="Right">
                                             <ui:Button Appearance="Secondary" Padding="10,8" Margin="0,0,6,0"
+                                                       Click="Favorite_Click"
+                                                       ToolTip="Favorite">
+                                                <ui:SymbolIcon Symbol="Heart12" FontSize="15" Filled="{Binding IsAnyFavorite}">
+                                                    <ui:SymbolIcon.Style>
+                                                        <Style TargetType="ui:SymbolIcon">
+                                                            <Setter Property="Foreground" Value="{ui:ThemeResource TextFillColorPrimaryBrush}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsAnyFavorite}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#E5484D"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:SymbolIcon.Style>
+                                                </ui:SymbolIcon>
+                                            </ui:Button>
+                                            <ui:Button Appearance="Secondary" Padding="10,8" Margin="0,0,6,0"
                                                        ToolTip="View details (description, BPM, tracks, notes…)"
                                                        Click="Details_Click">
-                                                <ui:SymbolIcon Symbol="DocumentText24" FontSize="17"/>
+                                                <ui:SymbolIcon Symbol="DocumentText24" FontSize="16"/>
                                             </ui:Button>
                                             <ui:Button Appearance="Secondary" Padding="10,8" Margin="0,0,6,0"
                                                        ToolTip="Preview — play without adding to Songs"
                                                        Click="Preview_Click">
-                                                <ui:SymbolIcon Symbol="PlayCircle24" FontSize="17"/>
+                                                <ui:SymbolIcon Symbol="PlayCircle24" FontSize="16"/>
                                             </ui:Button>
                                             <ui:Button Appearance="Primary" Padding="11,8"
                                                        ToolTip="Download to your Songs library"
@@ -568,9 +634,8 @@
                                 </Grid>
                             </Border>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
             <!-- Empty / status state -->
             <StackPanel VerticalAlignment="Center"
@@ -637,7 +702,7 @@
                                     <Ellipse Fill="{ui:ThemeResource ControlFillColorSecondaryBrush}"/>
                                     <Ellipse>
                                         <Ellipse.Fill>
-                                            <ImageBrush ImageSource="{Binding ThumbnailUrl}" Stretch="UniformToFill"/>
+                                            <ImageBrush ImageSource="{Binding ThumbnailUrl, Converter={StaticResource UrlToCachedImageConverter}}" Stretch="UniformToFill"/>
                                         </Ellipse.Fill>
                                     </Ellipse>
                                 </Grid>
@@ -744,6 +809,25 @@
 
                             <!-- Actions -->
                             <StackPanel Orientation="Horizontal" Margin="0,20,0,8">
+                                <ui:Button Appearance="Secondary" Padding="14,8" Margin="0,0,8,0"
+                                           Click="DetailFavorite_Click"
+                                           ToolTip="Favorite">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="Heart12" FontSize="15" Margin="0,0,6,0" Filled="{Binding SelectedDetailIsFavorite}">
+                                            <ui:SymbolIcon.Style>
+                                                <Style TargetType="ui:SymbolIcon">
+                                                    <Setter Property="Foreground" Value="{ui:ThemeResource TextFillColorPrimaryBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedDetailIsFavorite}" Value="True">
+                                                            <Setter Property="Foreground" Value="#E5484D"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ui:SymbolIcon.Style>
+                                        </ui:SymbolIcon>
+                                        <TextBlock Text="Favorite"/>
+                                    </StackPanel>
+                                </ui:Button>
                                 <ui:Button Appearance="Secondary" Padding="14,8" Margin="0,0,8,0" Command="{s:Action PreviewSelectedAsync}">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="PlayCircle24" FontSize="16" Margin="0,0,6,0"/>
@@ -784,7 +868,8 @@
                        Text="{Binding StatusMessage}"/>
 
             <StackPanel Grid.Column="1"
-                        Orientation="Horizontal">
+                        Orientation="Horizontal"
+                        Visibility="{Binding ShowPagination, Converter={x:Static s:BoolToVisibilityConverter.Instance}}">
                 <ui:Button Appearance="Secondary"
                            Padding="10,6"
                            Margin="0,0,6,0"
